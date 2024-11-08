@@ -1,65 +1,95 @@
-import { useState, useRef } from 'react'
-import Pin from './components/Pin'
-import Comment from './components/Comment'
+import { useState, useRef, useEffect } from 'react';
+import Pin from './components/Pin';
+import Comment from './components/Comment';
 
 function App() {
-  const [image1, setImage1] = useState(null)
-  const [image2, setImage2] = useState(null)
-  const [pins, setPins] = useState([])
-  const [selectedPinId, setSelectedPinId] = useState(null)
-  const [isSingleView, setIsSingleView] = useState(false)
-  const [activeTab, setActiveTab] = useState('active') // 'active' or 'completed'
-  const pinRefs = useRef({})
+  const [image1, setImage1] = useState(null);
+  const [image2, setImage2] = useState(null);
+  const [pins, setPins] = useState([]);
+  const [selectedPinId, setSelectedPinId] = useState(null);
+  const [isSingleView, setIsSingleView] = useState(false);
+  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'completed'
+  const pinRefs = useRef({});
+
+  useEffect(() => {
+    const fetchPins = async () => {
+      const response = await fetch('http://localhost:3000/pins'); // Corrected URL
+      const fetchedPins = await response.json();
+      setPins(fetchedPins);
+    };
+    fetchPins();
+  }, []);
 
   const handleImageUpload = (e, setImage) => {
-    const file = e.target.files[0]
+    const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onloadend = () => {
-        setImage(reader.result)
-      }
-      reader.readAsDataURL(file)
+        setImage(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
-  const handleLeftImageClick = (e) => {
-    if (!image1) return
+  const handleLeftImageClick = async (e) => {
+    if (!image1) return;
 
-    const rect = e.target.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    const rect = e.target.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
     const newPin = {
-      id: Date.now(),
       x,
       y,
       comments: [],
       files: [],
       completed: false,
       pinNumber: pins.length + 1 // Assign pin number based on current length of pins
+    };
+
+    try {
+      const response = await fetch('http://localhost:3000/pins', { // Corrected URL
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newPin),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create pin');
+      }
+
+      const createdPin = await response.json(); // Get the created pin from the response
+      setPins([...pins, createdPin]); // Add the created pin to the state
+      setSelectedPinId(createdPin.id);
+    } catch (error) {
+      console.error('Error adding pin:', error);
     }
+  };
 
-    setPins([...pins, newPin])
-    setSelectedPinId(newPin.id)
-
-    // Check if the new comment is empty and delete the pin if so
-    if (!newComment.trim()) {
-      handlePinDelete(newPin.id);
-    }
-  }
-
-  const handlePinUpdate = (pinId, updates) => {
+  const handlePinUpdate = async (pinId, updates) => {
+    await fetch(`http://localhost:3000/pins/${pinId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
     setPins(pins.map(pin => 
       pin.id === pinId 
         ? { ...pin, ...updates }
         : pin
-    ))
-  }
+    ));
+  };
 
-  const handlePinDelete = (pinId) => {
-    setPins(pins.filter(pin => pin.id !== pinId))
-    setSelectedPinId(null)
-  }
+  const handlePinDelete = async (pinId) => {
+    await fetch(`http://localhost:3000/pins/${pinId}`, {
+      method: 'DELETE',
+    });
+    setPins(pins.filter(pin => pin.id !== pinId));
+    setSelectedPinId(null);
+  };
 
   const handleCommentDelete = (pinId, commentIndex) => {
     const updatedPins = pins.map(pin => {
@@ -84,40 +114,36 @@ function App() {
   };
 
   const handlePinSelect = (pinId) => {
-    setSelectedPinId(pinId === selectedPinId ? null : pinId)
+    setSelectedPinId(pinId === selectedPinId ? null : pinId);
     
     if (pinId !== selectedPinId && pinRefs.current[pinId]) {
-      const container = document.querySelector('.main-scroll-container')
-      const pinElement = pinRefs.current[pinId]
-      const containerRect = container.getBoundingClientRect()
-      const pinRect = pinElement.getBoundingClientRect()
+      const container = document.querySelector('.main-scroll-container');
+      const pinElement = pinRefs.current[pinId];
+      const containerRect = container.getBoundingClientRect();
+      const pinRect = pinElement.getBoundingClientRect();
       
       if (pinRect.top < containerRect.top || pinRect.bottom > containerRect.bottom) {
         pinElement.scrollIntoView({
           behavior: 'smooth',
           block: 'center'
-        })
+        });
       }
     }
-  }
+  };
 
   const togglePinCompletion = (pinId) => {
-    setPins(pins.map(pin => 
-      pin.id === pinId 
-        ? { ...pin, completed: !pin.completed }
-        : pin
-    ))
-  }
+    handlePinUpdate(pinId, { completed: !pins.find(pin => pin.id === pinId).completed });
+  };
 
   const getCommentCount = (pin) => {
     return pin.comments.reduce((total, comment) => 
       total + 1 + (comment.replies?.length || 0), 0
-    )
-  }
+    );
+  };
 
   const filteredPins = pins.filter(pin => 
     activeTab === 'active' ? !pin.completed : pin.completed
-  )
+  );
 
   return (
     <div className="h-screen flex bg-gray-100">
@@ -309,7 +335,7 @@ function App() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
