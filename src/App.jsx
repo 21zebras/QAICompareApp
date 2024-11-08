@@ -10,14 +10,32 @@ function App() {
   const [isSingleView, setIsSingleView] = useState(false);
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'completed'
   const pinRefs = useRef({});
+  const image1Ref = useRef(null); // Reference for the first image
 
   useEffect(() => {
     const fetchPins = async () => {
-      const response = await fetch('http://localhost:3000/pins'); // Corrected URL
+      const response = await fetch('http://localhost:3000/pins');
       const fetchedPins = await response.json();
       setPins(fetchedPins);
     };
     fetchPins();
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      console.log('Window resized, updating pin positions...');
+      // Logic to update pin positions based on new image dimensions
+      setPins(prevPins => prevPins.map(pin => ({
+        ...pin,
+        x: pin.x, // Keep the same percentage
+        y: pin.y, // Keep the same percentage
+      })));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const handleImageUpload = (e, setImage) => {
@@ -35,8 +53,8 @@ function App() {
     if (!image1) return;
 
     const rect = e.target.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = ((e.clientX - rect.left) / rect.width) * 100; // Store as percentage
+    const y = ((e.clientY - rect.top) / rect.height) * 100; // Store as percentage
 
     const newPin = {
       x,
@@ -48,7 +66,7 @@ function App() {
     };
 
     try {
-      const response = await fetch('http://localhost:3000/pins', { // Corrected URL
+      const response = await fetch('http://localhost:3000/pins', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -273,8 +291,8 @@ function App() {
                           <Pin
                             key={pin.id}
                             ref={el => pinRefs.current[pin.id] = el}
-                            x={pin.x}
-                            y={pin.y}
+                            x={`${pin.x}%`} // Use percentage for positioning
+                            y={`${pin.y}%`} // Use percentage for positioning
                             comments={pin.comments}
                             files={pin.files}
                             completed={pin.completed}
